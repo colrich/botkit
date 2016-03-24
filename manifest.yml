@@ -1,0 +1,6 @@
+---
+applications:
+- name: botkitbot
+  command: node bot.js
+  env:
+    token: PUT_YOUR_BOTKIT_TOKEN_HERE

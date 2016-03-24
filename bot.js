@@ -63,7 +63,23 @@ This bot demonstrates many of the core features of Botkit:
 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+// grab the redis connection info from the environment
+var svcs = JSON.parse(process.env.VCAP_SERVICES);
+var creds = svcs.rediscloud[0].credentials;
 
+// grab the cleverbot api keys from the environment
+var cbotuser = svcs['user-provided'][0].credentials.user;
+var cbotapi = svcs['user-provided'][0].credentials.apikey;
+
+// create the redis botkit storage backend, configured with the credentials from our env
+var redis = require('./lib/storage/redis_storage');
+var redisStorage = redis({
+	host: creds['hostname'],
+	port: creds['port'],
+	auth_pass: creds['password'],
+});
+
+// the botkit token is stored in the environment, specified in a manifest rather than a cups
 if (!process.env.token) {
     console.log('Error: Specify token in environment');
     process.exit(1);
@@ -74,6 +90,7 @@ var os = require('os');
 
 var controller = Botkit.slackbot({
     debug: true,
+    storage: redisStorage,
 });
 
 var bot = controller.spawn({
@@ -185,3 +202,47 @@ function formatUptime(uptime) {
     uptime = uptime + ' ' + unit;
     return uptime;
 }
+
+var express = require('express');
+var _ = require('underscore');
+var app = express();
+// this bodyparser is needed for handling the post body from a custom slack /command
+var bodyParser = require('body-parser');
+app.use(bodyParser.urlencoded({ extended: true }));
+
+var cleverbot = require("cleverbot.io"),  
+    cleverbot = new cleverbot(cbotuser, cbotapi);
+cleverbot.setNick("cro-cleverbot");  
+cleverbot.create(function (err, session) {  
+	if (err) {
+	    console.log('cleverbot create fail.');
+	} else {
+	    console.log('cleverbot create success.');
+	}
+});
+
+controller.hears('','direct_message,direct_mention,mention',function(bot,message) {  
+	var msg = message.text;
+	cleverbot.ask(msg, function (err, response) {
+		if (!err) {
+		    bot.reply(message, response);
+		} else {
+		    console.log('cleverbot err: ' + err);
+		}
+	    });
+    })
+
+app.post('/echo', function(req, res) {
+	console.log("body: " + req.body);
+	console.log("body undef?: " + (typeof req.body == 'undefined'));
+	console.log(req.body.text);
+	console.log("params: " + Object.keys(req.body));
+	res.send(req.body.text);
+});
+
+// create the express http server on the port specified by cloud foundry in the environment
+// you must listen only on that port. we need this for handling /commands from slack, and 
+// this also helps us because the default cloud foundry health check tries to GET / and
+// expects it to return a 200
+var server = require('http').createServer(app);
+server.listen(process.env.PORT);

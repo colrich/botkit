@@ -10,6 +10,11 @@
     "mustache": "^2.2.1",
     "request": "^2.67.0",
     "ws": "^1.0.1",
+    "underscore": "~1.4.2",
+    "cfenv": "~1.0.3",
+    "redis": "~2.5.2",
+    "cleverbot.io": "~1.0.4",
+    "request": "~2.69.0",
     "https-proxy-agent": "^1.0.0"
   },
   "devDependencies": {
